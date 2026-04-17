@@ -98,6 +98,20 @@ func (c *Client) Process(ctx context.Context, link *transport.Link, dialer inter
 	if user != nil {
 		request.User = user
 		p = c.policyManager.ForLevel(user.Level)
+
+		if inbound := session.InboundFromContext(ctx); inbound != nil && inbound.User != nil && inbound.User.Email != "" {
+			if account, ok := user.Account.(*Account); ok {
+				request.User = &protocol.MemoryUser{
+					Email: inbound.User.Email,
+					Level: user.Level,
+					Account: &Account{
+						Username: inbound.User.Email,
+						Password: account.Password,
+					},
+				}
+				errors.LogDebug(ctx, "socks outbound uses inbound user email: ", inbound.User.Email)
+			}
+		}
 	}
 
 	if err := conn.SetDeadline(time.Now().Add(p.Timeouts.Handshake)); err != nil {

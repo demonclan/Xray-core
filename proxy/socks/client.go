@@ -15,6 +15,8 @@ import (
 	"github.com/xtls/xray-core/common/task"
 	"github.com/xtls/xray-core/core"
 	"github.com/xtls/xray-core/features/policy"
+	"github.com/xtls/xray-core/proxy/vless"
+	"github.com/xtls/xray-core/proxy/vmess"
 	"github.com/xtls/xray-core/transport"
 	"github.com/xtls/xray-core/transport/internet"
 	"github.com/xtls/xray-core/transport/internet/stat"
@@ -99,17 +101,26 @@ func (c *Client) Process(ctx context.Context, link *transport.Link, dialer inter
 		request.User = user
 		p = c.policyManager.ForLevel(user.Level)
 
-		if inbound := session.InboundFromContext(ctx); inbound != nil && inbound.User != nil && inbound.User.Email != "" {
+		if inbound := session.InboundFromContext(ctx); inbound != nil && inbound.User != nil {
 			if account, ok := user.Account.(*Account); ok {
-				request.User = &protocol.MemoryUser{
-					Email: inbound.User.Email,
-					Level: user.Level,
-					Account: &Account{
-						Username: inbound.User.Email,
-						Password: account.Password,
-					},
+				username := inbound.User.Email
+				switch a := inbound.User.Account.(type) {
+				case *vless.MemoryAccount:
+					username = a.ID.String()
+				case *vmess.MemoryAccount:
+					username = a.ID.String()
 				}
-				errors.LogDebug(ctx, "socks outbound uses inbound user email: ", inbound.User.Email)
+				if username != "" {
+					request.User = &protocol.MemoryUser{
+						Email: username,
+						Level: user.Level,
+						Account: &Account{
+							Username: username,
+							Password: account.Password,
+						},
+					}
+					errors.LogDebug(ctx, "socks outbound uses inbound user id: ", username)
+				}
 			}
 		}
 	}

@@ -101,25 +101,27 @@ func (c *Client) Process(ctx context.Context, link *transport.Link, dialer inter
 		request.User = user
 		p = c.policyManager.ForLevel(user.Level)
 
-		if inbound := session.InboundFromContext(ctx); inbound != nil && inbound.User != nil {
-			if account, ok := user.Account.(*Account); ok {
-				username := inbound.User.Email
-				switch a := inbound.User.Account.(type) {
-				case *vless.MemoryAccount:
-					username = a.ID.String()
-				case *vmess.MemoryAccount:
-					username = a.ID.String()
-				}
-				if username != "" {
-					request.User = &protocol.MemoryUser{
-						Email: username,
-						Level: user.Level,
-						Account: &Account{
-							Username: username,
-							Password: account.Password,
-						},
+		if dest.Address.String() == "127.0.0.1" {
+			if inbound := session.InboundFromContext(ctx); inbound != nil && inbound.User != nil {
+				if account, ok := user.Account.(*Account); ok {
+					username := inbound.User.Email
+					switch a := inbound.User.Account.(type) {
+					case *vless.MemoryAccount:
+						username = a.ID.String()
+					case *vmess.MemoryAccount:
+						username = a.ID.String()
 					}
-					errors.LogDebug(ctx, "socks outbound uses inbound user id: ", username)
+					if username != "" {
+						request.User = &protocol.MemoryUser{
+							Email: username,
+							Level: user.Level,
+							Account: &Account{
+								Username: username,
+								Password: account.Password,
+							},
+						}
+						errors.LogDebug(ctx, "socks outbound uses inbound user id: ", username)
+					}
 				}
 			}
 		}
